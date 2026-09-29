@@ -1,0 +1,149 @@
+{
+  "name": "AI Customer Support Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "563c696d-090f-47c3-ae38-96fdc3fc0cfb",
+      "name": "New Support Email",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        112
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9d4fRrqR73AEf3ch",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=A customer sent the following support email.\n\nFrom: {{ $json.from.text }}\nSubject: {{ $json.subject }}\n\nMessage:\n{{ $json.text }}\n\nWrite a helpful, professional reply to the customer.",
+        "options": {
+          "systemMessage": "You are a friendly and professional customer support agent. Write clear, empathetic email replies that directly address the customer's question. Be concise. If you do not have enough information to fully resolve the issue (for example order-specific details), acknowledge the request, reassure the customer, and let them know the team is looking into it. Sign off as \"The Support Team\". Output only the body text of the reply email, with no subject line and no placeholders in brackets."
+        }
+      },
+      "id": "fd8ccecc-7899-488e-a9fc-699a63f3ccf8",
+      "name": "Draft Support Reply",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "09d5a2b9-487d-47e2-9c52-19e993e25b63",
+      "name": "Groq Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        304,
+        336
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "L5W8ICm352jwOlxH",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $('New Support Email').item.json.id }}",
+        "emailType": "text",
+        "message": "={{ $json.output }}",
+        "options": {
+          "replyToSenderOnly": true
+        }
+      },
+      "id": "415303a6-4f02-4f80-bda7-e657bfadc8c1",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        576,
+        112
+      ],
+      "webhookId": "c6e9c9aa-7322-446b-bc5d-6d1ebae3721e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9d4fRrqR73AEf3ch",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Support Email": {
+      "main": [
+        [
+          {
+            "node": "Draft Support Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Support Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Draft Support Reply",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "e35c3d03-4a06-4c89-9797-143693563db9",
+  "meta": {
+    "instanceId": "69acaf3be1d24ad2674e146ee091835aa313b89841fc77330aa5436571e2aad9"
+  },
+  "nodeGroups": [],
+  "id": "xJ3IylC8EZIjov42",
+  "tags": []
+}
