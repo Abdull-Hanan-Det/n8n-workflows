@@ -1,0 +1,260 @@
+{
+  "name": "Automatic monitoring of multiple URLs with downtime alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "68e7e651-ca70-4908-96b7-780a930523a5",
+      "name": "When chat message received",
+      "webhookId": "dfc77d45-a970-4da2-ab9f-a7e783bf8206"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a skillustad assistant, Convince , Enroll User and Guide about Courses if Asked using the Tools\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "0af02855-d6ad-4156-b5f9-3c7ad5ec0bf9",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        272
+      ],
+      "id": "e6d63d83-0871-4ce5-8bbd-5b73eac3e285",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "kJoOVkG0i3jpvOaQ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        320
+      ],
+      "id": "696ce2f9-2ca0-45a3-949c-b31d190c90ae",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Get Courses Information from Google Sheet",
+        "documentId": {
+          "__rl": true,
+          "value": "14WNxT64FsIZFCBak_6jsBoFHJ9MQ5BOUQzQ8Ny9a-ms",
+          "mode": "list",
+          "cachedResultName": "Course Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14WNxT64FsIZFCBak_6jsBoFHJ9MQ5BOUQzQ8Ny9a-ms/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14WNxT64FsIZFCBak_6jsBoFHJ9MQ5BOUQzQ8Ny9a-ms/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        368,
+        208
+      ],
+      "id": "1622c629-8456-4d95-99e9-c0ae94396fc0",
+      "name": "Courses Data ",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Pd7cJNAVrFbdoQ0v",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Save Student Lead to Google Sheet ",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "14WNxT64FsIZFCBak_6jsBoFHJ9MQ5BOUQzQ8Ny9a-ms",
+          "mode": "list",
+          "cachedResultName": "Course Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14WNxT64FsIZFCBak_6jsBoFHJ9MQ5BOUQzQ8Ny9a-ms/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 345047942,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14WNxT64FsIZFCBak_6jsBoFHJ9MQ5BOUQzQ8Ny9a-ms/edit#gid=345047942"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Name', ``, 'string') }}",
+            "contact": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('contact', ``, 'string') }}",
+            "Course ": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Course_', ``, 'string') }}",
+            "mail": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('mail', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact",
+              "displayName": "contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Course ",
+              "displayName": "Course ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mail",
+              "displayName": "mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        576,
+        272
+      ],
+      "id": "1ff365b3-d329-43a8-b223-120f68a893d4",
+      "name": "Save Lead to CRM",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Pd7cJNAVrFbdoQ0v",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Courses Data ": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Lead to CRM": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "017ce3a0-7b6e-4d2f-adb2-d5d22327bad2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5d78e49c2a1c3f1244b8c1c0d6317ba4f7028f673e6f6fa669732b411ebdde2a"
+  },
+  "nodeGroups": [],
+  "id": "XNFGLPwMthc0deQf",
+  "tags": []
+}
