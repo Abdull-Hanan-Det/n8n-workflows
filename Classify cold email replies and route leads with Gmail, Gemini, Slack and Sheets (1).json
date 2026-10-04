@@ -1,0 +1,483 @@
+{
+  "name": "Classify cold email replies and route leads with Gmail, Gemini, Slack and Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ]
+        },
+        "options": {}
+      },
+      "id": "5ca56eb3-20af-4fa9-91e7-8dc24533abd4",
+      "name": "Watch for Outreach Replies",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1648,
+        16
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "BCsxzcyOJGaLgPge",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {}
+      },
+      "id": "7d21d8e5-db56-48ba-b394-797c68584179",
+      "name": "Fetch Full Reply Body",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1440,
+        16
+      ],
+      "webhookId": "d7d9a3e0-e1a8-49ba-b331-2058e8b69392",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "BCsxzcyOJGaLgPge",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Watch for Outreach Replies').item.json;\nconst full = $input.first().json;\n\nfunction stripHtml(html) {\n  return html\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction parseHeaderSender(headerStr, fallback) {\n  if (!headerStr) return fallback || '';\n  // Headers come as \"From: Name <email>\" — strip the \"From: \" prefix\n  const clean = headerStr.replace(/^From:\\s*/i, '').trim();\n  return clean;\n}\n\n// Strip quoted reply content (everything after \"On ... wrote:\")\nfunction stripQuotedReply(text) {\n  if (!text) return '';\n  return text\n    .replace(/\\r\\n/g, '\\n')\n    .replace(/On .+?wrote:\\n[\\s\\S]*/s, '')\n    .trim();\n}\n\n// With Simplify OFF, from/to come from headers object\nconst fromRaw = full.headers?.from || '';\nconst fromClean = parseHeaderSender(fromRaw, trigger.From);\nconst emailMatch = fromClean.match(/<(.+?)>/);\nconst fromEmail = emailMatch ? emailMatch[1] : fromClean;\nconst nameMatch = fromClean.match(/^\"?([^\"<]+)\"?\\s*</);\nconst fromName = nameMatch ? nameMatch[1].trim() : '';\n\nconst rawBody = full.text?.trim() || (full.html ? stripHtml(full.html) : '') || trigger.snippet || '';\n\n// Strip the quoted original message so Gemini only sees the actual reply\nconst cleanBody = stripQuotedReply(rawBody);\n\nreturn [{\n  json: {\n    recordId: full.id,\n    threadId: full.threadId,\n    from: fromClean,\n    fromEmail: fromEmail,\n    fromName: fromName,\n    subject: full.subject || trigger.Subject,\n    body: cleanBody,\n    receivedAt: full.date || trigger.internalDate\n  }\n}];"
+      },
+      "id": "e878f242-bef1-4e5d-bcda-142a3f4b7588",
+      "name": "Extract Email Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.recordId }}\n{{ $json.threadId }}\n{{ $json.from }}\n{{ $json.fromEmail }}\n{{ $json.fromName }}\n{{ $json.subject }}\n{{ $json.body }}",
+        "options": {
+          "systemMessage": "You classify replies to cold outreach emails. The user message contains: record id, thread id, sender, sender email, sender name, subject, and the reply body.\n\nClassify the reply into exactly one of these categories:\n- Interested: wants to talk, book a call, or learn more\n- Question: asks a question about the offer before deciding\n- Not Interested: declines or says no\n- Out of Office: auto-reply or away message\n- Unsubscribe: asks to be removed or stop emailing\n- Other: anything else, including automated notifications, newsletters, and non-replies\n\nFor Interested or Question, write a short, friendly, professional suggested reply (plain text, 2-5 sentences). For all other categories, leave suggested_reply empty.\n\nRespond with ONLY a JSON object, no markdown and no extra text, in this exact shape:\n{\"classification\": \"<category>\", \"confidence\": <0-1>, \"reasoning\": \"<one sentence>\", \"suggested_reply\": \"<text or empty>\"}"
+        }
+      },
+      "id": "ba370709-77fa-44e4-8ea3-50ef9fca436c",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -992,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "id": "75735967-90fd-41d1-bf40-0877e6f84492",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1136,
+        224
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "CUDfuLBdZ9YHFE16",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst raw =\n  item.output ||                                              // AI Agent output\n  item.content?.parts?.[0]?.text ||                          // direct candidate object (your current shape)\n  item.candidates?.[0]?.content?.parts?.[0]?.text ||          // candidates-wrapped shape\n  item.text ||\n  '';\n\nconst cleaned = raw.replace(/```json|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {\n    classification: 'Needs Manual Review',\n    confidence: 0,\n    reasoning: 'AI response could not be parsed',\n    suggested_reply: ''\n  };\n}\n\nreturn {\n  json: {\n    ...$('Extract Email Details').item.json,\n    ...parsed\n  }\n};"
+      },
+      "id": "b1e20473-c049-4cad-b0e5-484089603559",
+      "name": "Parse AI Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1wlD4kAGKsXIrJQMQQdXr7b5n_ulCYlibcZTRmPVD0fA",
+          "mode": "list",
+          "cachedResultName": "Maps Lead Scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wlD4kAGKsXIrJQMQQdXr7b5n_ulCYlibcZTRmPVD0fA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wlD4kAGKsXIrJQMQQdXr7b5n_ulCYlibcZTRmPVD0fA/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "recordId": "={{ $json.recordId }}",
+            "threadId": "={{ $json.threadId }}",
+            "from": "={{ $json.from }}",
+            "fromEmail": "={{ $json.fromEmail }}",
+            "fromName": "={{ $json.fromName }}",
+            "subject": "={{ $json.subject }}",
+            "body": "={{ $json.body }}",
+            "receivedAt": "={{ $json.receivedAt }}",
+            "classification": "={{ $json.classification }}",
+            "suggested_reply": "={{ $json.suggested_reply }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "recordId",
+              "displayName": "recordId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "threadId",
+              "displayName": "threadId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "from",
+              "displayName": "from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fromEmail",
+              "displayName": "fromEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fromName",
+              "displayName": "fromName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "receivedAt",
+              "displayName": "receivedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "classification",
+              "displayName": "classification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "suggested_reply",
+              "displayName": "suggested_reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c7d793b6-fbe4-4342-8306-cd69e0aefff1",
+      "name": "Log Lead to Tracker",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -448,
+        16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ud7M2DqgYrWeRBZG",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "2526ddf5-3355-4271-9978-4c756419b517",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.classification }}",
+              "rightValue": "Interested"
+            },
+            {
+              "id": "820dcb74-b8e8-407d-b969-ef11e0c90de0",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.classification }}",
+              "rightValue": "Question"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "38d019b1-d0bb-4f77-a3ad-e61557c9984e",
+      "name": "Is Lead Actionable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re: {{ $('Parse AI Classification').item.json.subject }}",
+        "message": "={{ $('Parse AI Classification').item.json.suggested_reply }}",
+        "options": {
+          "threadId": "={{ $('Parse AI Classification').item.json.threadId }}",
+          "sendTo": "={{ $('Parse AI Classification').item.json.fromEmail }}"
+        }
+      },
+      "id": "12b57831-7757-4734-977b-9a262c352738",
+      "name": "Draft AI Suggested Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "b990e9e6-bc0c-4e8f-abad-97405ad30606",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "BCsxzcyOJGaLgPge",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C31HM9L77",
+          "mode": "list",
+          "cachedResultName": "leads"
+        },
+        "text": "=:mailbox_with_mail: New actionable reply — {{ $('Parse AI Classification').item.json.classification }}\n*From:* {{ $('Parse AI Classification').item.json.from }}\n*Subject:* {{ $('Parse AI Classification').item.json.subject }}\n*AI note:* {{ $('Parse AI Classification').item.json.reasoning }}\n:pencil2: <https://mail.google.com/mail/u/0/#drafts/{{ $json.id }}|Open draft reply>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "31f3cb85-237f-423e-bfae-783bdede77b0",
+      "name": "Alert Sales Rep",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        0
+      ],
+      "webhookId": "993d14c3-7d3b-4bcf-9431-12dea2931ccd",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "6NOG06IQ7JsqrF5B",
+          "name": "Slack account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Watch for Outreach Replies": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full Reply Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Reply Body": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Details": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Classification": {
+      "main": [
+        [
+          {
+            "node": "Log Lead to Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead to Tracker": {
+      "main": [
+        [
+          {
+            "node": "Is Lead Actionable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Lead Actionable?": {
+      "main": [
+        [
+          {
+            "node": "Draft AI Suggested Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft AI Suggested Reply": {
+      "main": [
+        [
+          {
+            "node": "Alert Sales Rep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "797dfae2-2c01-423f-9afd-cf3c8f997e42",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4ac1e3b9a51375e057548c3683d157dca0c2064aac0e3919a944910679d2df22"
+  },
+  "nodeGroups": [],
+  "id": "JfqfIHaiFNMUtoTL",
+  "tags": []
+}
