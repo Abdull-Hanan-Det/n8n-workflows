@@ -1,0 +1,409 @@
+{
+  "name": "Business Scrape Leads",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "a517caf4-d44d-4b0f-bd5a-790e4af99074",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "q",
+              "name": "query",
+              "value": "psychotherapist",
+              "type": "string"
+            },
+            {
+              "id": "loc",
+              "name": "location",
+              "value": "Pakistan ",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "75f41c1b-e095-4927-956a-7819ed2f47cc",
+      "name": "Search Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        272,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/places",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.query }}"
+            },
+            {
+              "name": "location",
+              "value": "={{ $json.location }}"
+            },
+            {
+              "name": "gl",
+              "value": "us"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9a272f92-fa64-465f-9ca2-b4431aae588d",
+      "name": "Search Google Maps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        496,
+        128
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GADhpsEj6LKHbPOd",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "places",
+        "options": {}
+      },
+      "id": "0e63a6ce-e2cd-48cd-ac29-042f55b6b66e",
+      "name": "Split Businesses",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        720,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "name",
+              "name": "business_name",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "web",
+              "name": "website",
+              "value": "={{ $json.website }}",
+              "type": "string"
+            },
+            {
+              "id": "phone",
+              "name": "phone",
+              "value": "={{ $json.phoneNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "addr",
+              "name": "address",
+              "value": "={{ $json.address }}",
+              "type": "string"
+            },
+            {
+              "id": "cat",
+              "name": "category",
+              "value": "={{ $json.category }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "67439056-aa2a-437b-86ca-feade4707610",
+      "name": "Map Lead Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        800,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.website }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "0a5b188f-9ac9-4c20-a24c-ebbad22e883c",
+      "name": "Fetch Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        128
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const lead = $('Map Lead Fields').item.json;\nconst html = typeof $json.data === 'string' ? $json.data : '';\nconst match = html.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/);\nreturn {\n  json: {\n    business_name: lead.business_name,\n    website: lead.website,\n    email: match ? match[0] : \"\",\n    phone: lead.phone,\n    address: lead.address,\n    category: lead.category,\n  },\n};"
+      },
+      "id": "c0028d40-027b-4f52-a840-10bb91d7020e",
+      "name": "Extract Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1f3JknVhXWZzWKMhshLdR4Jkb35HlDPLafcv7oGAVcF8",
+          "mode": "list",
+          "cachedResultName": "Business Scrape Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1f3JknVhXWZzWKMhshLdR4Jkb35HlDPLafcv7oGAVcF8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1f3JknVhXWZzWKMhshLdR4Jkb35HlDPLafcv7oGAVcF8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "business_name": "={{ $json.business_name }}",
+            "website": "={{ $json.website }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "address": "={{ $json.address }}",
+            "category": "={{ $json.category }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "business_name",
+              "displayName": "business_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "address",
+              "displayName": "address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e53fbdba-cd29-4cca-b4a1-5271e099ef40",
+      "name": "Save Leads to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1472,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WfT7lIGzCqrWdh4y",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Search Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Config": {
+      "main": [
+        [
+          {
+            "node": "Search Google Maps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Google Maps": {
+      "main": [
+        [
+          {
+            "node": "Split Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Businesses": {
+      "main": [
+        [
+          {
+            "node": "Map Lead Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Lead Fields": {
+      "main": [
+        [
+          {
+            "node": "Fetch Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Website": {
+      "main": [
+        [
+          {
+            "node": "Extract Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email": {
+      "main": [
+        [
+          {
+            "node": "Save Leads to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6c66319f-9a0f-419c-b89f-abb790b65984",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e763392ca4b83a22ab03fc0dca01ad46cd76fab23346fe5af5f389f1bd2daac0"
+  },
+  "nodeGroups": [
+    {
+      "id": "df6cc37c-6503-46b6-8aba-8f75a0e63747",
+      "name": "Find business listings",
+      "nodeIds": [
+        "75f41c1b-e095-4927-956a-7819ed2f47cc",
+        "9a272f92-fa64-465f-9ca2-b4431aae588d",
+        "0e63a6ce-e2cd-48cd-ac29-042f55b6b66e"
+      ],
+      "description": "Runs the daily search on Google Maps listings and splits each matching business into its own record"
+    },
+    {
+      "id": "4320e683-f564-46c6-8e48-4b4c0545676a",
+      "name": "Enrich and save leads",
+      "nodeIds": [
+        "67439056-aa2a-437b-86ca-feade4707610",
+        "0a5b188f-9ac9-4c20-a24c-ebbad22e883c",
+        "c0028d40-027b-4f52-a840-10bb91d7020e",
+        "e53fbdba-cd29-4cca-b4a1-5271e099ef40"
+      ],
+      "description": "Pulls name, phone, address and website, checks each site for a public email, then appends every lead to Google Sheets"
+    }
+  ],
+  "id": "r2Ps2NaWXQHPPAlY",
+  "tags": []
+}
